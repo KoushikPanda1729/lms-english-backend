@@ -154,6 +154,28 @@ export function buildSignalingGateway(
       }
     })
 
+    // ─── chat_message ──────────────────────────────────────────────────────────
+    //
+    // Either peer can send a text message during the call. Relay to other peer.
+
+    socket.on(
+      "chat_message",
+      async (payload: { roomId: string; text: string; messageId: string }) => {
+        try {
+          const { roomId, text, messageId } = payload
+          if (!roomId || typeof text !== "string" || !text.trim()) return
+          if (!(await assertRoomMember(redis, roomId, userId))) return
+
+          socket.to(`room:${roomId}`).emit("chat_message", {
+            messageId: messageId ?? `${Date.now()}`,
+            text: text.trim(),
+          })
+        } catch (err) {
+          logger.error("chat_message error", { error: err, userId })
+        }
+      },
+    )
+
     // ─── end_call ──────────────────────────────────────────────────────────────
     //
     // Either peer can end the call. Notifies the other, then cleans up all
