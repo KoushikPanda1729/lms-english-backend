@@ -41,7 +41,7 @@ const resetPasswordSchema = z.object({
 
 // ─── Cookie helpers ────────────────────────────────────────────────────────────
 
-const IS_PROD = Config.NODE_ENV === "production"
+const IS_PROD = Config.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false"
 const REFRESH_MAX_AGE = 30 * 24 * 60 * 60 * 1000 // 30d
 const ACCESS_MAX_AGE = 15 * 60 * 1000 // 15m
 

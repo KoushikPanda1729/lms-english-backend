@@ -26,16 +26,10 @@ export function buildApp(container: Container): Application {
   // ─── Security middleware — applied FIRST (before all routes including webhook) ─
   app.use(
     cors({
-      origin: ["http://localhost:3000", "http://localhost:3001"],
+      origin: true,
       credentials: true,
     }),
   )
-  // app.use(
-  //   cors({
-  //     origin: Config.CORS_ORIGINS.length ? Config.CORS_ORIGINS : "*",
-  //     credentials: true,
-  //   }),
-  // )
   app.use(helmet())
   app.use(cookieParser())
   app.use(
