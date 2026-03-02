@@ -44,6 +44,9 @@ import { CouponController } from "./modules/coupons/coupon.controller"
 import { SupportMessage } from "./entities/SupportMessage.entity"
 import { SupportService } from "./modules/support/support.service"
 import { SupportController } from "./modules/support/support.controller"
+import { OnboardingQuestion } from "./entities/OnboardingQuestion.entity"
+import { OnboardingService } from "./modules/onboarding/onboarding.service"
+import { OnboardingController } from "./modules/onboarding/onboarding.controller"
 
 export function buildContainer() {
   // ─── Repositories ───────────────────────────────────────────────────────────
@@ -67,6 +70,7 @@ export function buildContainer() {
   const paymentRepo = AppDataSource.getRepository(Payment)
   const couponRepo = AppDataSource.getRepository(Coupon)
   const supportMessageRepo = AppDataSource.getRepository(SupportMessage)
+  const onboardingQuestionRepo = AppDataSource.getRepository(OnboardingQuestion)
 
   // ─── Shared services ────────────────────────────────────────────────────────
   const storageService = new StorageService()
@@ -142,6 +146,10 @@ export function buildContainer() {
   const supportService = new SupportService(supportMessageRepo)
   const supportController = new SupportController(supportService)
 
+  // ─── Onboarding ──────────────────────────────────────────────────────────────
+  const onboardingService = new OnboardingService(onboardingQuestionRepo, profileRepo)
+  const onboardingController = new OnboardingController(onboardingService)
+
   // ─── Payments ───────────────────────────────────────────────────────────────
   const paymentProvider = createPaymentProvider()
   const paymentService = new PaymentService(
@@ -170,6 +178,7 @@ export function buildContainer() {
     couponController,
     supportService,
     supportController,
+    onboardingController,
     userRepo,
     profileRepo,
   }

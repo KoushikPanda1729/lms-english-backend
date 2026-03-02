@@ -17,6 +17,7 @@ import {
 import { paymentRouter } from "./modules/payments/payment.routes"
 import { couponRouter } from "./modules/coupons/coupon.routes"
 import { supportRouter } from "./modules/support/support.routes"
+import { onboardingRouter, adminOnboardingRouter } from "./modules/onboarding/onboarding.routes"
 import { jwksRouter } from "./modules/well-known/jwks.routes"
 import { globalErrorHandler } from "./middleware/error.middleware"
 import type { Container } from "./container"
@@ -78,6 +79,8 @@ export function buildApp(container: Container): Application {
   app.use("/admin", adminCourseRouter(container.courseController))
   app.use("/admin", couponRouter(container.couponController))
   app.use("/admin", supportRouter(container.supportController))
+  app.use("/onboarding", onboardingRouter(container.onboardingController))
+  app.use("/admin", adminOnboardingRouter(container.onboardingController))
   app.use("/.well-known", jwksRouter())
 
   // ─── Global error handler (must be last) ─────────────────────────────────────

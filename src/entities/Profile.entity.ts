@@ -58,6 +58,9 @@ export class Profile {
   @Column({ name: "last_session_at", nullable: true, type: "timestamp" })
   lastSessionAt!: Date | null
 
+  @Column({ name: "onboarding_completed", type: "boolean", default: false })
+  onboardingCompleted!: boolean
+
   @Column({ name: "last_active_at", type: "timestamp", default: () => "CURRENT_TIMESTAMP" })
   lastActiveAt!: Date
 

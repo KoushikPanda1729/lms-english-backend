@@ -226,11 +226,19 @@ export class AuthService {
 
   // ─── Self ──────────────────────────────────────────────────────────────────
 
-  async self(userId: string): Promise<Omit<User, "passwordHash">> {
-    const user = await this.userRepo.findOne({ where: { id: userId } })
+  async self(
+    userId: string,
+  ): Promise<Omit<User, "passwordHash"> & { onboardingCompleted: boolean }> {
+    const user = await this.userRepo.findOne({
+      where: { id: userId },
+      relations: ["profile"],
+    })
     if (!user) throw new UnauthorizedError("User not found")
     const { passwordHash: _pw, ...safe } = user
-    return safe
+    return {
+      ...safe,
+      onboardingCompleted: user.profile?.onboardingCompleted ?? false,
+    }
   }
 
   // ─── Private: issue token pair ─────────────────────────────────────────────
