@@ -14,6 +14,13 @@ interface SocketData {
 
 const ADMIN_ROLES = ["admin", "super_admin", "moderator"]
 
+// ─── Module-level online state (single-server deployment) ───────────────────
+// Tracks which non-admin users are currently connected and how many
+// admin sockets are online so we can broadcast status changes.
+
+const onlineUsers = new Set<string>() // non-admin userIds
+let adminCount = 0
+
 // ─── Gateway ───────────────────────────────────────────────────────────────────
 
 export function buildSupportGateway(
@@ -25,12 +32,49 @@ export function buildSupportGateway(
     const { userId, role } = socket.data as SocketData
     const isAdmin = ADMIN_ROLES.includes(role)
 
-    // Admins automatically join the global support room so they receive
-    // all new user messages while the support page is open.
+    // ── Online tracking ───────────────────────────────────────────────────
+
     if (isAdmin) {
+      adminCount++
       socket.join("support:admin")
-      logger.debug(`Admin ${userId} joined support:admin room`)
+      logger.debug(`Admin ${userId} joined support:admin room (adminCount=${adminCount})`)
+
+      // Send current online user list to this newly connected admin
+      socket.emit("support_initial_online_users", { userIds: Array.from(onlineUsers) })
+
+      // Tell all connected users that an admin is now online
+      if (adminCount === 1) {
+        io.emit("support_admin_online", { online: true })
+      }
+    } else {
+      onlineUsers.add(userId)
+      io.to("support:admin").emit("support_user_status", { userId, online: true })
+      logger.debug(`User ${userId} is online for support`)
     }
+
+    // ── support_status_check (user → ask if admin is online) ─────────────
+
+    socket.on("support_status_check", () => {
+      if (!isAdmin) {
+        socket.emit("support_admin_status", { online: adminCount > 0 })
+      }
+    })
+
+    // ── Disconnect ────────────────────────────────────────────────────────
+
+    socket.on("disconnect", () => {
+      if (isAdmin) {
+        adminCount = Math.max(0, adminCount - 1)
+        logger.debug(`Admin ${userId} disconnected (adminCount=${adminCount})`)
+        if (adminCount === 0) {
+          io.emit("support_admin_online", { online: false })
+        }
+      } else {
+        onlineUsers.delete(userId)
+        io.to("support:admin").emit("support_user_status", { userId, online: false })
+        logger.debug(`User ${userId} went offline for support`)
+      }
+    })
 
     // ─── support_send (user → admin) ───────────────────────────────────────
     //
@@ -49,7 +93,18 @@ export function buildSupportGateway(
         const displayName = profile?.displayName || profile?.username || "User"
         const avatarUrl = profile?.avatarUrl || null
 
-        // Notify admins
+        // Check if an admin is actively watching this user's thread
+        const watchingAdmins = io.sockets.adapter.rooms.get(`support:user:${userId}`)?.size ?? 0
+
+        if (watchingAdmins > 0) {
+          // Auto-mark as read since admin is looking at the thread
+          await supportService.markMessagesRead(userId)
+          io.to("support:admin").emit("support_read", { userId })
+          // Tell user their message was instantly read (blue ticks)
+          socket.emit("support_read_by_admin", { userId })
+        }
+
+        // Notify admins of the new message
         io.to("support:admin").emit("support_new_message", {
           messageId: msg.id,
           userId,
@@ -60,11 +115,21 @@ export function buildSupportGateway(
           createdAt: msg.createdAt,
         })
 
-        // Confirm to sender
+        // Confirm to sender (single tick → sent)
         socket.emit("support_sent", { messageId: msg.id, createdAt: msg.createdAt })
       } catch (err) {
         logger.error("support_send error", { error: err, userId })
       }
+    })
+
+    // ─── support_typing (user → admin) ────────────────────────────────────
+
+    socket.on("support_typing", (payload: { typing: boolean }) => {
+      if (isAdmin) return
+      io.to("support:admin").emit("support_user_typing", {
+        userId,
+        typing: payload?.typing ?? false,
+      })
     })
 
     // ─── admin_support_join ────────────────────────────────────────────────
@@ -83,6 +148,16 @@ export function buildSupportGateway(
 
         // Tell all admins the unread count for this user is now 0
         io.to("support:admin").emit("support_read", { userId: targetUserId })
+
+        // Tell the user their messages have been read (enables blue double tick)
+        io.to(`user:${targetUserId}`).emit("support_read_by_admin", { userId: targetUserId })
+
+        // Tell this admin whether the user is currently online
+        socket.emit("support_user_status", {
+          userId: targetUserId,
+          online: onlineUsers.has(targetUserId),
+        })
+
         logger.debug(`Admin ${userId} joined support room for user ${targetUserId}`)
       } catch (err) {
         logger.error("admin_support_join error", { error: err, userId })
@@ -94,7 +169,22 @@ export function buildSupportGateway(
     socket.on("admin_support_leave", (payload: { userId: string }) => {
       if (!isAdmin) return
       const targetUserId = payload?.userId
-      if (targetUserId) socket.leave(`support:user:${targetUserId}`)
+      if (targetUserId) {
+        socket.leave(`support:user:${targetUserId}`)
+        // Stop typing indicator for this user
+        io.to(`user:${targetUserId}`).emit("support_admin_typing", { typing: false })
+      }
+    })
+
+    // ─── admin_support_typing (admin → user) ──────────────────────────────
+
+    socket.on("admin_support_typing", (payload: { userId: string; typing: boolean }) => {
+      if (!isAdmin) return
+      const targetUserId = payload?.userId
+      if (!targetUserId) return
+      io.to(`user:${targetUserId}`).emit("support_admin_typing", {
+        typing: payload?.typing ?? false,
+      })
     })
 
     // ─── admin_support_send (admin → user) ────────────────────────────────
@@ -109,6 +199,9 @@ export function buildSupportGateway(
         if (!targetUserId || !text?.trim()) return
 
         const msg = await supportService.saveMessage(targetUserId, text.trim(), true)
+
+        // Stop typing indicator
+        io.to(`user:${targetUserId}`).emit("support_admin_typing", { typing: false })
 
         // Push to user (they are in `user:{userId}` room from matchmaking gateway)
         io.to(`user:${targetUserId}`).emit("support_reply", {
