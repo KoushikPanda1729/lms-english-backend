@@ -10,7 +10,7 @@ export function globalErrorHandler(
   res: Response,
   _next: NextFunction,
 ): void {
-  // Multer errors (file too large, unexpected field, etc.)
+  // Multer errors(file too large, unexpected field, etc.)
   if (err instanceof multer.MulterError) {
     const message =
       err.code === "LIMIT_FILE_SIZE" ? "File too large. Maximum size is 5MB" : err.message
