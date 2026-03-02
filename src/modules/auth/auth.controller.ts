@@ -24,11 +24,16 @@ const loginSchema = z.object({
   platform: z.nativeEnum(Platform).default(Platform.WEB),
 })
 
-const googleSignInSchema = z.object({
-  idToken: z.string().min(1, "Google ID token is required"),
-  deviceId: z.string().default("web"),
-  platform: z.nativeEnum(Platform).default(Platform.WEB),
-})
+const googleSignInSchema = z
+  .object({
+    idToken: z.string().optional(),
+    accessToken: z.string().optional(),
+    deviceId: z.string().default("web"),
+    platform: z.nativeEnum(Platform).default(Platform.WEB),
+  })
+  .refine((d) => d.idToken || d.accessToken, {
+    message: "Either idToken or accessToken is required",
+  })
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Invalid email"),

@@ -25,7 +25,8 @@ export interface TokenPair {
 }
 
 export interface GoogleSignInParams {
-  idToken: string
+  idToken?: string // mobile / credential flow
+  accessToken?: string // web useGoogleLogin flow
   deviceId: string
   platform: Platform
 }

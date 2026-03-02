@@ -160,18 +160,35 @@ export class AuthService {
   // ─── Google Sign-In ────────────────────────────────────────────────────────
 
   async googleSignIn(params: GoogleSignInParams): Promise<TokenPair> {
-    // Verify the idToken with Google
-    const ticket = await googleClient.verifyIdToken({
-      idToken: params.idToken,
-      audience: Config.GOOGLE_CLIENT_ID,
-    })
+    let googleId: string
+    let email: string
+    let email_verified: boolean
 
-    const payload = ticket.getPayload()
-    if (!payload || !payload.email) {
-      throw new UnauthorizedError("Invalid Google token")
+    if (params.idToken) {
+      // Mobile / credential button flow — verify ID token locally
+      const ticket = await googleClient.verifyIdToken({
+        idToken: params.idToken,
+        audience: Config.GOOGLE_CLIENT_ID,
+      })
+      const payload = ticket.getPayload()
+      if (!payload || !payload.email) throw new UnauthorizedError("Invalid Google token")
+      googleId = payload.sub!
+      email = payload.email
+      email_verified = payload.email_verified ?? true
+    } else if (params.accessToken) {
+      // Web useGoogleLogin flow — verify via userinfo endpoint
+      const res = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+        headers: { Authorization: `Bearer ${params.accessToken}` },
+      })
+      if (!res.ok) throw new UnauthorizedError("Invalid Google access token")
+      const info = (await res.json()) as { sub: string; email?: string; email_verified?: boolean }
+      if (!info.email) throw new UnauthorizedError("Google did not return an email")
+      googleId = info.sub
+      email = info.email
+      email_verified = info.email_verified ?? true
+    } else {
+      throw new UnauthorizedError("No Google token provided")
     }
-
-    const { sub: googleId, email, email_verified } = payload
 
     // Find existing user by googleId or email
     let user = await this.userRepo.findOne({
