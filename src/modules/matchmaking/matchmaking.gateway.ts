@@ -54,8 +54,8 @@ async function popValidPartner(redis: Redis, level: string): Promise<string | nu
 
 async function cleanupQueue(userId: string, redis: Redis): Promise<void> {
   await redis.del(keys.searching(userId))
-  const levels = ["all", "beginner", "intermediate", "advanced"]
-  await Promise.all(levels.map((l) => redis.lrem(keys.queue(l), 0, userId)))
+  // Single global queue — remove from it
+  await redis.lrem(keys.queue("all"), 0, userId)
 }
 
 // ─── Gateway ───────────────────────────────────────────────────────────────────
@@ -125,17 +125,11 @@ export function buildMatchmakingGateway(
           return
         }
 
-        // Guard: profile incomplete
-        const profile = await profileRepo.findOne({ where: { userId } })
-        if (!profile?.username || !profile?.englishLevel) {
-          socket.emit("error", {
-            code: "PROFILE_INCOMPLETE",
-            message: "Set your username and English level before searching",
-          })
-          return
-        }
+        // Fetch profile for display info in match_found payload
+        // const profile = await profileRepo.findOne({ where: { userId } })
 
-        const level = payload.level || profile.englishLevel
+        // Everyone goes into the same global queue — no level restriction
+        const level = "all"
         const topic = payload.topic || null
 
         // Try to pop a valid waiting partner
