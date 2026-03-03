@@ -270,10 +270,21 @@ export class AuthService {
       }),
     )
 
+    // Load profile to get onboardingCompleted (use cached relation if already loaded)
+    const profile =
+      user.profile ??
+      (await this.userRepo.findOne({ where: { id: user.id }, relations: ["profile"] }))?.profile
+
     return {
       accessToken,
       refreshToken: plainRefreshToken,
-      user: { id: user.id, email: user.email, role: user.role },
+      user: {
+        id: user.id,
+        email: user.email,
+        name: profile?.displayName ?? user.email.split("@")[0],
+        role: user.role,
+        onboardingCompleted: profile?.onboardingCompleted ?? false,
+      },
     }
   }
 }

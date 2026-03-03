@@ -20,7 +20,9 @@ export interface TokenPair {
   user: {
     id: string
     email: string
+    name: string
     role: string
+    onboardingCompleted: boolean
   }
 }
 
