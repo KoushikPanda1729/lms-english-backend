@@ -15,8 +15,10 @@ export class UserService {
   // ─── Get my profile ────────────────────────────────────────────────────────
 
   async getMe(userId: string): Promise<Profile> {
-    const profile = await this.profileRepo.findOne({ where: { userId } })
-    if (!profile) throw new NotFoundError("Profile not found")
+    let profile = await this.profileRepo.findOne({ where: { userId } })
+    if (!profile) {
+      profile = await this.profileRepo.save(this.profileRepo.create({ userId }))
+    }
     return profile
   }
 

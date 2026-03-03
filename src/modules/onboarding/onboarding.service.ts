@@ -32,8 +32,10 @@ export class OnboardingService {
       answers: { questionId: string; selectedIndex: number }[]
     },
   ): Promise<{ englishLevel: EnglishLevel }> {
-    const profile = await this.profileRepo.findOne({ where: { userId } })
-    if (!profile) throw new NotFoundError("Profile not found")
+    let profile = await this.profileRepo.findOne({ where: { userId } })
+    if (!profile) {
+      profile = this.profileRepo.create({ userId })
+    }
 
     // Score the test
     const englishLevel = await this.scoreTest(data.answers)
