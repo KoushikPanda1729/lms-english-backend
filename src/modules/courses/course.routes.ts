@@ -3,6 +3,7 @@ import multer from "multer"
 import { CourseController } from "./course.controller"
 import { authMiddleware } from "../../middleware/auth.middleware"
 import { adminMiddleware } from "../../middleware/admin.middleware"
+import { optionalAuthMiddleware } from "../../middleware/optionalAuth.middleware"
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -19,9 +20,13 @@ const videoUpload = multer({
 export function courseRouter(controller: CourseController): Router {
   const router = Router()
 
-  // Public — no auth needed to browse courses
-  router.get("/", (req, res, next) => controller.listCourses(req, res, next))
-  router.get("/:id", (req, res, next) => controller.getCourse(req, res, next))
+  // Public — optional auth to attach enrollment data for logged-in users
+  router.get("/", optionalAuthMiddleware, (req, res, next) =>
+    controller.listCourses(req, res, next),
+  )
+  router.get("/:id", optionalAuthMiddleware, (req, res, next) =>
+    controller.getCourse(req, res, next),
+  )
 
   // Authenticated
   router.get("/my", authMiddleware, (req, res, next) => controller.getMyCourses(req, res, next))

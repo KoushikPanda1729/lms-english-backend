@@ -83,15 +83,15 @@ export class CourseService {
     const [courses, total] = await qb.getManyAndCount()
 
     if (!adminMode && courses.length > 0) {
-      let enrolledSet = new Set<string>()
       if (userId) {
         const enrollments = await this.courseProgressRepo.find({
           where: courses.map((c) => ({ userId, courseId: c.id })),
-          select: ["courseId"],
         })
-        enrolledSet = new Set(enrollments.map((e) => e.courseId))
+        const enrollmentMap = new Map(enrollments.map((e) => [e.courseId, e]))
+        courses.forEach((c) => Object.assign(c, { enrollment: enrollmentMap.get(c.id) ?? null }))
+      } else {
+        courses.forEach((c) => Object.assign(c, { enrollment: null }))
       }
-      courses.forEach((c) => Object.assign(c, { enrolled: enrolledSet.has(c.id) }))
     }
 
     return { courses, total, page, limit }
@@ -120,7 +120,7 @@ export class CourseService {
     courseId: string,
     userId?: string,
   ): Promise<
-    Course & { lessons: Lesson[]; enrolled: boolean; progress: UserCourseProgress | null }
+    Course & { lessons: Lesson[]; enrolled: boolean; enrollment: UserCourseProgress | null }
   > {
     const course = await this.courseRepo.findOne({ where: { id: courseId, isPublished: true } })
     if (!course) throw new NotFoundError("Course not found")
@@ -138,7 +138,7 @@ export class CourseService {
       enrolled = progress !== null
     }
 
-    return Object.assign(course, { lessons, enrolled, progress })
+    return Object.assign(course, { lessons, enrolled, enrollment: progress })
   }
 
   // ─── POST /courses/:id/enroll ─────────────────────────────────────────────────
