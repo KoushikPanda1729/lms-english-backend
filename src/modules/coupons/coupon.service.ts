@@ -104,6 +104,31 @@ export class CouponService {
     await this.couponRepo.remove(coupon)
   }
 
+  // ─── GET public available coupons for a course ───────────────────────────────
+  // Returns active, non-expired, non-exhausted coupons that apply to courseId
+  // (global coupons + course-specific ones). Only safe fields are exposed.
+
+  async listAvailableForCourse(
+    courseId: string,
+  ): Promise<{ code: string; discountPercent: number; expiresAt: Date | null }[]> {
+    const now = new Date()
+
+    const coupons = await this.couponRepo
+      .createQueryBuilder("c")
+      .where("c.is_active = true")
+      .andWhere("(c.expires_at IS NULL OR c.expires_at > :now)", { now })
+      .andWhere("(c.max_uses IS NULL OR c.used_count < c.max_uses)")
+      .andWhere("(c.course_id IS NULL OR c.course_id = :courseId)", { courseId })
+      .orderBy("c.discount_percent", "DESC")
+      .getMany()
+
+    return coupons.map((c) => ({
+      code: c.code,
+      discountPercent: c.discountPercent,
+      expiresAt: c.expiresAt,
+    }))
+  }
+
   // ─── Validate coupon at quote time ────────────────────────────────────────────
   // Called by PaymentService.createPriceQuote
 

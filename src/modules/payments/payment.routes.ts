@@ -15,6 +15,11 @@ export function paymentRouter(controller: PaymentController): Router {
 
   // ── Authenticated routes ──────────────────────────────────────────────────────
 
+  // Available coupons for a course (auth-only, non-admin)
+  router.get("/courses/:courseId/coupons", authMiddleware, (req, res, next) =>
+    controller.listAvailableCoupons(req, res, next),
+  )
+
   // Step 1 — Get a short-lived price quote token (10 min TTL, one active per user+course)
   router.get("/courses/:courseId/quote", authMiddleware, (req, res, next) =>
     controller.createPriceQuote(req, res, next),

@@ -77,6 +77,20 @@ export class PaymentController {
     }
   }
 
+  // ─── GET /payments/courses/:courseId/coupons ──────────────────────────────────
+
+  async listAvailableCoupons(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const courseId = String(req.params.courseId)
+      if (!uuidRegex.test(courseId)) throw new ValidationError("Invalid course ID")
+
+      const coupons = await this.paymentService.listAvailableCoupons(courseId)
+      res.json(success(coupons, "Available coupons fetched"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
   // ─── GET /payments/history ────────────────────────────────────────────────────
 
   async getHistory(req: Request, res: Response, next: NextFunction): Promise<void> {

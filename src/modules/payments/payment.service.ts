@@ -274,6 +274,16 @@ export class PaymentService {
     }
   }
 
+  // ─── GET /payments/courses/:courseId/coupons ──────────────────────────────────
+  // Public (auth-only) — returns active coupons valid for this course
+
+  async listAvailableCoupons(
+    courseId: string,
+  ): Promise<{ code: string; discountPercent: number; expiresAt: Date | null }[]> {
+    if (!this.couponService) return []
+    return this.couponService.listAvailableForCourse(courseId)
+  }
+
   // ─── GET /payments/history ────────────────────────────────────────────────────
 
   async getHistory(
