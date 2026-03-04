@@ -35,6 +35,9 @@ export function courseRouter(controller: CourseController): Router {
   router.get("/:id/lessons/:lessonId", authMiddleware, (req, res, next) =>
     controller.getLesson(req, res, next),
   )
+  router.get("/:id/lessons/:lessonId/stream", authMiddleware, (req, res, next) =>
+    controller.getLessonStream(req, res, next),
+  )
   router.post("/:id/lessons/:lessonId/complete", authMiddleware, (req, res, next) =>
     controller.completeLesson(req, res, next),
   )

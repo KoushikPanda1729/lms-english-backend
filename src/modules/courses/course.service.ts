@@ -6,6 +6,8 @@ import { UserLessonProgress } from "../../entities/UserLessonProgress.entity"
 import { EnglishLevel, LessonType } from "../../enums/index"
 import { NotFoundError, ForbiddenError, ConflictError } from "../../shared/errors"
 import { StorageService } from "../../services/storage.service"
+import { HlsService } from "../../services/hls.service"
+import { Config } from "../../config/config"
 
 interface ListCoursesFilters {
   level?: EnglishLevel
@@ -57,6 +59,7 @@ export class CourseService {
     private readonly courseProgressRepo: Repository<UserCourseProgress>,
     private readonly lessonProgressRepo: Repository<UserLessonProgress>,
     private readonly storageService: StorageService,
+    private readonly hlsService: HlsService,
   ) {}
 
   // ─── GET /courses  (public) · GET /admin/courses (admin) ─────────────────────
@@ -93,6 +96,10 @@ export class CourseService {
         courses.forEach((c) => Object.assign(c, { enrollment: null }))
       }
     }
+
+    courses.forEach((c) => {
+      c.thumbnailUrl = this.storageService.signIfNeeded(c.thumbnailUrl)
+    })
 
     return { courses, total, page, limit }
   }
@@ -138,6 +145,10 @@ export class CourseService {
       enrolled = progress !== null
     }
 
+    course.thumbnailUrl = this.storageService.signIfNeeded(course.thumbnailUrl)
+    lessons.forEach((l) => {
+      l.pdfUrl = this.storageService.signIfNeeded(l.pdfUrl)
+    })
     return Object.assign(course, { lessons, enrolled, enrollment: progress })
   }
 
@@ -178,7 +189,36 @@ export class CourseService {
     }
 
     const done = await this.lessonProgressRepo.findOne({ where: { userId, lessonId } })
-    return Object.assign(lesson, { completed: done !== null })
+    const result = Object.assign(lesson, { completed: done !== null })
+
+    if (lesson.hlsPath) {
+      // HLS: return stream endpoint URL (serves signed m3u8)
+      result.videoUrl = `${Config.APP_URL}/courses/${courseId}/lessons/${lessonId}/stream`
+    } else {
+      // Direct video or YouTube: sign if CloudFront
+      result.videoUrl = this.storageService.signIfNeeded(lesson.videoUrl, 900)
+    }
+
+    result.pdfUrl = this.storageService.signIfNeeded(lesson.pdfUrl)
+
+    return result
+  }
+
+  // ─── GET /courses/:id/lessons/:lessonId/stream ────────────────────────────────
+
+  async getLessonStream(courseId: string, lessonId: string, userId: string): Promise<string> {
+    const course = await this.courseRepo.findOne({ where: { id: courseId, isPublished: true } })
+    if (!course) throw new NotFoundError("Course not found")
+
+    const lesson = await this.lessonRepo.findOne({ where: { id: lessonId, courseId } })
+    if (!lesson || !lesson.hlsPath) throw new NotFoundError("HLS stream not found for this lesson")
+
+    if (course.isPremium) {
+      const enrollment = await this.courseProgressRepo.findOne({ where: { userId, courseId } })
+      if (!enrollment) throw new ForbiddenError("Enroll in this course to access lessons")
+    }
+
+    return this.hlsService.buildSignedM3u8(lesson.hlsPath)
   }
 
   // ─── POST /courses/:id/lessons/:lessonId/complete ─────────────────────────────
@@ -361,21 +401,38 @@ export class CourseService {
     const lesson = await this.lessonRepo.findOne({ where: { id: lessonId, courseId } })
     if (!lesson) throw new NotFoundError("Lesson not found")
 
-    // Delete previous S3 video (skip YouTube/external URLs)
+    // Delete previous HLS files
+    if (lesson.hlsPath) {
+      await this.hlsService.deleteHls(lesson.hlsPath).catch(() => null)
+      lesson.hlsPath = null
+    }
+
+    // Delete previous direct video (skip YouTube/external URLs)
     if (
       lesson.videoUrl &&
       !lesson.videoUrl.includes("youtube.com") &&
-      !lesson.videoUrl.includes("youtu.be")
+      !lesson.videoUrl.includes("youtu.be") &&
+      !lesson.videoUrl.includes("/stream")
     ) {
       await this.storageService
         .delete(this.storageService.extractKey(lesson.videoUrl))
         .catch(() => null)
     }
 
-    const ext = file.originalname.split(".").pop() ?? "mp4"
-    const key = `courses/${courseId}/lessons/${lessonId}/video-${Date.now()}.${ext}`
-    const url = await this.storageService.upload(key, file.buffer, file.mimetype)
-    lesson.videoUrl = url
+    if (this.storageService.isHlsConfigured()) {
+      // HLS path: convert to segments and upload
+      const hlsPath = `courses/${courseId}/lessons/${lessonId}/hls`
+      await this.hlsService.convertAndUpload(file.buffer, hlsPath, file.mimetype)
+      lesson.hlsPath = hlsPath
+      lesson.videoUrl = null
+    } else {
+      // Fallback: upload raw video directly
+      const ext = file.originalname.split(".").pop() ?? "mp4"
+      const key = `courses/${courseId}/lessons/${lessonId}/video-${Date.now()}.${ext}`
+      const url = await this.storageService.upload(key, file.buffer, file.mimetype)
+      lesson.videoUrl = url
+    }
+
     lesson.type = LessonType.VIDEO
     return this.lessonRepo.save(lesson)
   }

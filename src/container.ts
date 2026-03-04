@@ -22,6 +22,7 @@ import { NotificationService } from "./modules/notifications/notification.servic
 import { NotificationController } from "./modules/notifications/notification.controller"
 import { createNotificationProvider } from "./modules/notifications/providers/notification-provider.factory"
 import { StorageService } from "./services/storage.service"
+import { HlsService } from "./services/hls.service"
 import { Course } from "./entities/Course.entity"
 import { Lesson } from "./entities/Lesson.entity"
 import { Quiz } from "./entities/Quiz.entity"
@@ -74,6 +75,7 @@ export function buildContainer() {
 
   // ─── Shared services ────────────────────────────────────────────────────────
   const storageService = new StorageService()
+  const hlsService = new HlsService(storageService)
   const redis = getRedisClient()
 
   // ─── Notifications (constructed early — needed by AuthController & PaymentService) ──
@@ -125,6 +127,7 @@ export function buildContainer() {
     courseProgressRepo,
     lessonProgressRepo,
     storageService,
+    hlsService,
   )
   const quizService = new QuizService(
     quizRepo,

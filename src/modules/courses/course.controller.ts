@@ -205,6 +205,23 @@ export class CourseController {
     }
   }
 
+  // ─── GET /courses/:id/lessons/:lessonId/stream ────────────────────────────────
+
+  async getLessonStream(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id)
+      const lessonId = String(req.params.lessonId)
+      this.validateUuid(id, "course ID")
+      this.validateUuid(lessonId, "lesson ID")
+      const m3u8 = await this.courseService.getLessonStream(id, lessonId, req.user!.id)
+      res.setHeader("Content-Type", "application/x-mpegURL")
+      res.setHeader("Cache-Control", "no-store")
+      res.send(m3u8)
+    } catch (err) {
+      next(err)
+    }
+  }
+
   // ─── POST /courses/:id/lessons/:lessonId/complete ─────────────────────────────
 
   async completeLesson(req: Request, res: Response, next: NextFunction): Promise<void> {

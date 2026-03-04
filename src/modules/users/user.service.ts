@@ -19,7 +19,7 @@ export class UserService {
     if (!profile) {
       profile = await this.profileRepo.save(this.profileRepo.create({ userId }))
     }
-    return profile
+    return this.signProfile(profile)
   }
 
   // ─── Update my profile ─────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ export class UserService {
 
     // Let DB unique constraint handle race condition — catch and convert to user-friendly error
     try {
-      return await this.profileRepo.save(profile)
+      return this.signProfile(await this.profileRepo.save(profile))
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : ""
       if (msg.includes("UQ_") || msg.includes("unique")) {
@@ -83,13 +83,14 @@ export class UserService {
     const url = await this.storageService.upload(key, processed, "image/webp")
 
     profile.avatarUrl = url
-    return this.profileRepo.save(profile)
+    return this.signProfile(await this.profileRepo.save(profile))
   }
 
   // ─── Delete avatar ─────────────────────────────────────────────────────────
 
   async deleteAvatar(userId: string): Promise<Profile> {
-    const profile = await this.getMe(userId)
+    const profile = await this.profileRepo.findOne({ where: { userId } })
+    if (!profile) throw new NotFoundError("Profile not found")
 
     if (!profile.avatarUrl) {
       throw new ValidationError("No avatar to delete")
@@ -101,7 +102,7 @@ export class UserService {
     })
 
     profile.avatarUrl = null
-    return this.profileRepo.save(profile)
+    return this.signProfile(await this.profileRepo.save(profile))
   }
 
   // ─── Get public profile ────────────────────────────────────────────────────
@@ -114,7 +115,7 @@ export class UserService {
       userId: profile.userId,
       username: profile.username,
       displayName: profile.displayName,
-      avatarUrl: profile.avatarUrl,
+      avatarUrl: this.storageService.signIfNeeded(profile.avatarUrl),
       bio: profile.bio,
       englishLevel: profile.englishLevel,
       country: profile.country,
@@ -122,5 +123,11 @@ export class UserService {
       totalPracticeMins: profile.totalPracticeMins,
       streakDays: profile.streakDays,
     }
+  }
+
+  private signProfile(profile: Profile): Profile {
+    return Object.assign(Object.create(Object.getPrototypeOf(profile)), profile, {
+      avatarUrl: this.storageService.signIfNeeded(profile.avatarUrl),
+    })
   }
 }

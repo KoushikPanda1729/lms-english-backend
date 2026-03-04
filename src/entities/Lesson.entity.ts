@@ -39,6 +39,9 @@ export class Lesson {
   @Column({ name: "pdf_url", type: "varchar", nullable: true })
   pdfUrl!: string | null
 
+  @Column({ name: "hls_path", type: "varchar", nullable: true })
+  hlsPath!: string | null
+
   @Column({ name: "order", type: "integer", default: 0 })
   order!: number
 

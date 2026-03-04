@@ -85,6 +85,10 @@ const {
   RESEND_API_KEY,
   EMAIL_FROM,
 
+  // CloudFront signing (for HLS signed URLs)
+  CLOUDFRONT_KEY_PAIR_ID,
+  CLOUDFRONT_PRIVATE_KEY,
+
   // Admin seed (used in seed script to create first admin account)
   ADMIN_EMAIL,
   ADMIN_PASSWORD,
@@ -100,6 +104,10 @@ const publicKey = (PUBLIC_KEY?.replace(/\\n/g, "\n") || "").replace(/^"|"$/g, ""
 
 // Firebase private key also has the same escaped newline issue
 const firebasePrivateKey = (FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n") || "").replace(/^"|"$/g, "")
+const cloudFrontPrivateKey = (CLOUDFRONT_PRIVATE_KEY?.replace(/\\n/g, "\n") || "").replace(
+  /^"|"$/g,
+  "",
+)
 
 // ─── Export ────────────────────────────────────────────────────────────────────
 
@@ -166,6 +174,10 @@ export const Config = {
   STORAGE_SECRET_KEY: STORAGE_SECRET_KEY || "",
   STORAGE_BUCKET_NAME: STORAGE_BUCKET_NAME || "",
   STORAGE_PUBLIC_URL: STORAGE_PUBLIC_URL || "",
+
+  // CloudFront signing
+  CLOUDFRONT_KEY_PAIR_ID: CLOUDFRONT_KEY_PAIR_ID || "",
+  CLOUDFRONT_PRIVATE_KEY: cloudFrontPrivateKey,
 
   // Email
   RESEND_API_KEY: RESEND_API_KEY || "",
