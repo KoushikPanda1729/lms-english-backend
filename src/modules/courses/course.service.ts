@@ -321,8 +321,6 @@ export class CourseService {
     return this.courseRepo.save(course)
   }
 
-  // ─── ADMIN: Create lesson ─────────────────────────────────────────────────────
-
   // ─── ADMIN: List lessons for a course ────────────────────────────────────────
 
   async listLessons(courseId: string): Promise<Lesson[]> {
@@ -330,6 +328,8 @@ export class CourseService {
     if (!course) throw new NotFoundError("Course not found")
     return this.lessonRepo.find({ where: { courseId }, order: { order: "ASC" } })
   }
+
+  // ─── ADMIN: Create lesson ─────────────────────────────────────────────────────
 
   async createLesson(courseId: string, dto: CreateLessonDto): Promise<Lesson> {
     const course = await this.courseRepo.findOne({ where: { id: courseId } })
@@ -446,6 +446,9 @@ export class CourseService {
     // Delete all lesson S3 assets before removing the course
     const lessons = await this.lessonRepo.find({ where: { courseId } })
     for (const lesson of lessons) {
+      if (lesson.hlsPath) {
+        await this.hlsService.deleteHls(lesson.hlsPath).catch(() => null)
+      }
       if (
         lesson.videoUrl &&
         !lesson.videoUrl.includes("youtube.com") &&
@@ -477,6 +480,9 @@ export class CourseService {
     const lesson = await this.lessonRepo.findOne({ where: { id: lessonId, courseId } })
     if (!lesson) throw new NotFoundError("Lesson not found")
 
+    if (lesson.hlsPath) {
+      await this.hlsService.deleteHls(lesson.hlsPath).catch(() => null)
+    }
     if (
       lesson.videoUrl &&
       !lesson.videoUrl.includes("youtube.com") &&
@@ -486,7 +492,6 @@ export class CourseService {
         .delete(this.storageService.extractKey(lesson.videoUrl))
         .catch(() => null)
     }
-
     if (lesson.pdfUrl) {
       await this.storageService
         .delete(this.storageService.extractKey(lesson.pdfUrl))
