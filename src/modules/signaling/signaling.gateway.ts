@@ -176,6 +176,37 @@ export function buildSignalingGateway(
       },
     )
 
+    // ─── typing ────────────────────────────────────────────────────────────────
+    //
+    // Either peer can broadcast their typing state. Relay to the other peer.
+
+    socket.on("typing", async (payload: { roomId: string; isTyping: boolean }) => {
+      try {
+        const { roomId, isTyping } = payload
+        if (typeof roomId !== "string" || !roomId) return
+        if (!(await assertRoomMember(redis, roomId, userId))) return
+        socket.to(`room:${roomId}`).emit("typing", { isTyping })
+      } catch (err) {
+        logger.error("typing error", { error: err, userId })
+      }
+    })
+
+    // ─── message_delivered ─────────────────────────────────────────────────────
+    //
+    // Sent by the receiver when they render a message. Relayed back to the
+    // original sender so they can upgrade to double-tick.
+
+    socket.on("message_delivered", async (payload: { roomId: string; messageId: string }) => {
+      try {
+        const { roomId, messageId } = payload
+        if (!roomId || !messageId) return
+        if (!(await assertRoomMember(redis, roomId, userId))) return
+        socket.to(`room:${roomId}`).emit("message_delivered", { messageId })
+      } catch (err) {
+        logger.error("message_delivered error", { error: err, userId })
+      }
+    })
+
     // ─── end_call ──────────────────────────────────────────────────────────────
     //
     // Either peer can end the call. Notifies the other, then cleans up all
