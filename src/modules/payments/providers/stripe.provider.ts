@@ -26,7 +26,7 @@ export class StripeProvider implements IPaymentProvider {
         {
           price_data: {
             currency: params.currency,
-            unit_amount: params.amount,
+            unit_amount: params.amount * 100, // convert rupees → paise (Stripe smallest unit)
             product_data: {
               name: params.courseTitle,
             },

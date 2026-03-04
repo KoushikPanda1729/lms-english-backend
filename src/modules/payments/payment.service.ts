@@ -215,9 +215,9 @@ export class PaymentService {
       // Idempotent — ignore if not found or already processed
       if (!payment || payment.status === PaymentStatus.PAID) return
 
-      // Price integrity check — amount Stripe actually charged must match our DB record.
-      // Protects against tampered or mis-routed webhook events.
-      if (event.amountPaid !== null && event.amountPaid !== payment.amount) {
+      // Price integrity check — Stripe returns amount in paise, DB stores in rupees.
+      // Multiply DB amount by 100 before comparing.
+      if (event.amountPaid !== null && event.amountPaid !== payment.amount * 100) {
         logger.error("Payment amount mismatch — webhook ignored", {
           providerSessionId: event.providerSessionId,
           expectedAmount: payment.amount,
