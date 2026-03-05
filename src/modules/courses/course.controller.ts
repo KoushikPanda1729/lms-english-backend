@@ -213,7 +213,12 @@ export class CourseController {
       const lessonId = String(req.params.lessonId)
       this.validateUuid(id, "course ID")
       this.validateUuid(lessonId, "lesson ID")
-      const m3u8 = await this.courseService.getLessonStream(id, lessonId, req.user!.id)
+      const m3u8 = await this.courseService.getLessonStream(
+        id,
+        lessonId,
+        req.user!.id,
+        req.user!.role === "admin",
+      )
       res.setHeader("Content-Type", "application/x-mpegURL")
       res.setHeader("Cache-Control", "no-store")
       res.send(m3u8)

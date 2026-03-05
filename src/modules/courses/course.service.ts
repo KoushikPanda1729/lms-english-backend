@@ -206,14 +206,19 @@ export class CourseService {
 
   // ─── GET /courses/:id/lessons/:lessonId/stream ────────────────────────────────
 
-  async getLessonStream(courseId: string, lessonId: string, userId: string): Promise<string> {
+  async getLessonStream(
+    courseId: string,
+    lessonId: string,
+    userId: string,
+    isAdmin = false,
+  ): Promise<string> {
     const course = await this.courseRepo.findOne({ where: { id: courseId, isPublished: true } })
     if (!course) throw new NotFoundError("Course not found")
 
     const lesson = await this.lessonRepo.findOne({ where: { id: lessonId, courseId } })
     if (!lesson || !lesson.hlsPath) throw new NotFoundError("HLS stream not found for this lesson")
 
-    if (course.isPremium) {
+    if (course.isPremium && !isAdmin) {
       const enrollment = await this.courseProgressRepo.findOne({ where: { userId, courseId } })
       if (!enrollment) throw new ForbiddenError("Enroll in this course to access lessons")
     }
