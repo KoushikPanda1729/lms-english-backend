@@ -83,12 +83,23 @@ export class SessionService {
     page: number,
     limit: number,
   ): Promise<{ sessions: CallSession[]; total: number; page: number; limit: number }> {
-    const [sessions, total] = await this.sessionRepo.findAndCount({
-      where: [{ userAId: userId }, { userBId: userId }],
-      order: { startedAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    })
+    const [sessions, total] = await this.sessionRepo
+      .createQueryBuilder("s")
+      .where("s.userAId = :uid OR s.userBId = :uid", { uid: userId })
+      .leftJoinAndSelect("s.userA", "ua")
+      .leftJoinAndSelect("s.userB", "ub")
+      .leftJoinAndSelect("ua.profile", "pa")
+      .leftJoinAndSelect("ub.profile", "pb")
+      .leftJoinAndMapMany("s.ratings", SessionRating, "rt", "rt.session_id = s.id")
+      .leftJoinAndSelect("rt.rater", "rtr")
+      .leftJoinAndSelect("rt.rated", "rtd")
+      .leftJoinAndSelect("rtr.profile", "rtrp")
+      .leftJoinAndSelect("rtd.profile", "rtdp")
+      .orderBy("s.startedAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount()
+
     return { sessions, total, page, limit }
   }
 
