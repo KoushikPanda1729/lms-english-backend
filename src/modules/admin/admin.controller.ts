@@ -112,6 +112,37 @@ export class AdminController {
     }
   }
 
+  // ─── GET /admin/users/:id/courses ─────────────────────────────────────────────
+
+  async getUserCourses(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id)
+      if (!uuidRegex.test(id)) throw new ValidationError("Invalid user ID")
+
+      const courses = await this.adminService.getUserCourses(id)
+      res.json(success(courses, "User courses fetched"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  // ─── GET /admin/courses/:courseId/students ─────────────────────────────────────
+
+  async getCourseStudents(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const courseId = String(req.params.courseId)
+      if (!uuidRegex.test(courseId)) throw new ValidationError("Invalid course ID")
+
+      const page = Math.max(1, Number(req.query.page) || 1)
+      const limit = Math.min(100, Math.max(1, Number(req.query.limit) || 20))
+
+      const result = await this.adminService.getCourseStudents(courseId, page, limit)
+      res.json(success(result, "Course students fetched"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
   // ─── GET /admin/analytics ─────────────────────────────────────────────────────
 
   async getAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {

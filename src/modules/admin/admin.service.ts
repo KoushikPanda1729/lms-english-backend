@@ -1,4 +1,4 @@
-import { Repository } from "typeorm"
+import { Repository, In } from "typeorm"
 import { User } from "../../entities/User.entity"
 import { Profile } from "../../entities/Profile.entity"
 import { RefreshToken } from "../../entities/RefreshToken.entity"
@@ -225,6 +225,122 @@ export class AdminService {
     }
   }
 
+  // ─── GET /admin/users/:id/courses ─────────────────────────────────────────────
+
+  async getUserCourses(userId: string): Promise<
+    {
+      courseId: string
+      title: string
+      level: string | null
+      isPremium: boolean
+      totalLessons: number
+      progressPercent: number
+      completedLessons: number
+      enrolledAt: Date
+      completedAt: Date | null
+      payment: { status: string; amount: number } | null
+    }[]
+  > {
+    const progressRows = await this.courseProgressRepo
+      .createQueryBuilder("p")
+      .leftJoinAndSelect("p.course", "c")
+      .where("p.userId = :userId", { userId })
+      .orderBy("p.enrolledAt", "DESC")
+      .getMany()
+
+    const courseIds = progressRows.map((p) => p.courseId)
+    const payments =
+      courseIds.length > 0
+        ? await this.paymentRepo.find({ where: { userId, courseId: In(courseIds) } })
+        : []
+
+    const paymentMap = new Map(payments.map((p) => [p.courseId, p]))
+
+    return progressRows.map((p) => {
+      const course = (
+        p as typeof p & {
+          course?: { title: string; level: string | null; isPremium: boolean; totalLessons: number }
+        }
+      ).course
+      const payment = paymentMap.get(p.courseId)
+      return {
+        courseId: p.courseId,
+        title: course?.title ?? "Unknown",
+        level: course?.level ?? null,
+        isPremium: course?.isPremium ?? false,
+        totalLessons: course?.totalLessons ?? 0,
+        progressPercent: p.progressPercent,
+        completedLessons: p.completedLessons,
+        enrolledAt: p.enrolledAt,
+        completedAt: p.completedAt,
+        payment: payment ? { status: payment.status, amount: payment.amount } : null,
+      }
+    })
+  }
+
+  // ─── GET /admin/courses/:courseId/students ─────────────────────────────────────
+
+  async getCourseStudents(
+    courseId: string,
+    page: number,
+    limit: number,
+  ): Promise<{
+    students: {
+      userId: string
+      email: string
+      displayName: string | null
+      avatarUrl: string | null
+      progressPercent: number
+      completedLessons: number
+      enrolledAt: Date
+      completedAt: Date | null
+      payment: { status: string; amount: number } | null
+    }[]
+    total: number
+    page: number
+    limit: number
+  }> {
+    const [progressRows, total] = await this.courseProgressRepo
+      .createQueryBuilder("p")
+      .leftJoinAndSelect("p.user", "u")
+      .where("p.courseId = :courseId", { courseId })
+      .orderBy("p.enrolledAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount()
+
+    const userIds = progressRows.map((p) => p.userId)
+    const [profiles, payments] =
+      userIds.length > 0
+        ? await Promise.all([
+            this.profileRepo.find({ where: { userId: In(userIds) } }),
+            this.paymentRepo.find({ where: { courseId, userId: In(userIds) } }),
+          ])
+        : [[], []]
+
+    const profileMap = new Map(profiles.map((p) => [p.userId, p]))
+    const paymentMap = new Map(payments.map((p) => [p.userId, p]))
+
+    const students = progressRows.map((p) => {
+      const user = (p as typeof p & { user?: { email: string } }).user
+      const profile = profileMap.get(p.userId)
+      const payment = paymentMap.get(p.userId)
+      return {
+        userId: p.userId,
+        email: user?.email ?? "",
+        displayName: profile?.displayName ?? null,
+        avatarUrl: profile?.avatarUrl ?? null,
+        progressPercent: p.progressPercent,
+        completedLessons: p.completedLessons,
+        enrolledAt: p.enrolledAt,
+        completedAt: p.completedAt,
+        payment: payment ? { status: payment.status, amount: payment.amount } : null,
+      }
+    })
+
+    return { students, total, page, limit }
+  }
+
   // ─── GET /admin/analytics ─────────────────────────────────────────────────────
 
   async getAnalytics(): Promise<{
@@ -259,7 +375,7 @@ export class AdminService {
         .getRawOne<{ total: string }>(),
     ])
 
-    const totalRevenue = revenueResult?.total ? Math.round(Number(revenueResult.total) / 100) : 0
+    const totalRevenue = revenueResult?.total ? Math.round(Number(revenueResult.total)) : 0
 
     // Top courses by enrollment (up to 10)
     const courses = await this.courseRepo
