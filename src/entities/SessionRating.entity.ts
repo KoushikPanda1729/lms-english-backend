@@ -41,6 +41,9 @@ export class SessionRating {
   @Column({ type: "smallint" })
   stars!: number
 
+  @Column({ type: "varchar", length: 500, nullable: true })
+  feedback!: string | null
+
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date
 }

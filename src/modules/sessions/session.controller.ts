@@ -8,6 +8,7 @@ const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
 
 const rateSchema = z.object({
   stars: z.number().int().min(1, "Minimum 1 star").max(5, "Maximum 5 stars"),
+  feedback: z.string().max(500).optional().nullable(),
 })
 
 const historyQuerySchema = z.object({
@@ -63,8 +64,23 @@ export class SessionController {
       const parsed = rateSchema.safeParse(req.body)
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message)
 
-      await this.sessionService.rateSession(id, req.user!.id, parsed.data.stars)
+      await this.sessionService.rateSession(
+        id,
+        req.user!.id,
+        parsed.data.stars,
+        parsed.data.feedback,
+      )
       res.json(success(null, "Rating submitted"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  async getSessionByRoom(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const roomId = String(req.params.roomId)
+      const session = await this.sessionService.getSessionByRoom(roomId, req.user!.id)
+      res.json(success(session, "Session fetched"))
     } catch (err) {
       next(err)
     }

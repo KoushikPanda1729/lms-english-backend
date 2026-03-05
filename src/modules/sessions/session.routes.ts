@@ -9,6 +9,7 @@ export function sessionRouter(controller: SessionController): Router {
   router.use(authMiddleware)
 
   router.get("/", (req, res, next) => controller.getMyHistory(req, res, next))
+  router.get("/by-room/:roomId", (req, res, next) => controller.getSessionByRoom(req, res, next))
   router.get("/:id", (req, res, next) => controller.getSession(req, res, next))
   router.post("/:id/rate", (req, res, next) => controller.rateSession(req, res, next))
 

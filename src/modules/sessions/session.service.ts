@@ -105,7 +105,12 @@ export class SessionService {
 
   // ─── HTTP: POST /sessions/:id/rate ────────────────────────────────────────────
 
-  async rateSession(sessionId: string, raterId: string, stars: number): Promise<void> {
+  async rateSession(
+    sessionId: string,
+    raterId: string,
+    stars: number,
+    feedback?: string | null,
+  ): Promise<void> {
     const session = await this.sessionRepo.findOne({ where: { id: sessionId } })
     if (!session) throw new NotFoundError("Session not found")
 
@@ -120,8 +125,25 @@ export class SessionService {
     const existing = await this.ratingRepo.findOne({ where: { sessionId, raterId } })
     if (existing) throw new ConflictError("You have already rated this session")
 
-    const rating = this.ratingRepo.create({ sessionId, raterId, ratedId, stars })
+    const rating = this.ratingRepo.create({
+      sessionId,
+      raterId,
+      ratedId,
+      stars,
+      feedback: feedback ?? null,
+    })
     await this.ratingRepo.save(rating)
+  }
+
+  // ─── HTTP: GET /sessions/by-room/:roomId ──────────────────────────────────────
+
+  async getSessionByRoom(roomId: string, userId: string): Promise<CallSession> {
+    const session = await this.sessionRepo.findOne({ where: { roomId } })
+    if (!session) throw new NotFoundError("Session not found")
+    if (session.userAId !== userId && session.userBId !== userId) {
+      throw new ForbiddenError("You are not a participant of this session")
+    }
+    return session
   }
 
   // ─── ADMIN: List all sessions ─────────────────────────────────────────────────
@@ -137,6 +159,11 @@ export class SessionService {
       .leftJoinAndSelect("s.userB", "ub")
       .leftJoinAndSelect("ua.profile", "pa")
       .leftJoinAndSelect("ub.profile", "pb")
+      .leftJoinAndMapMany("s.ratings", SessionRating, "rt", "rt.session_id = s.id")
+      .leftJoinAndSelect("rt.rater", "rtr")
+      .leftJoinAndSelect("rt.rated", "rtd")
+      .leftJoinAndSelect("rtr.profile", "rtrp")
+      .leftJoinAndSelect("rtd.profile", "rtdp")
       .orderBy("s.startedAt", "DESC")
       .skip((page - 1) * limit)
       .take(limit)
