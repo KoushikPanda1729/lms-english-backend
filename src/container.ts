@@ -84,6 +84,7 @@ export function buildContainer() {
     deviceTokenRepo,
     notificationRepo,
     notificationProvider,
+    userRepo,
   )
   const notificationController = new NotificationController(notificationService)
 

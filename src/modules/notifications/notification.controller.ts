@@ -96,6 +96,37 @@ export class NotificationController {
     }
   }
 
+  // ─── GET /notifications/unread-count ──────────────────────────────────────────
+
+  async getUnreadCount(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const count = await this.notificationService.getUnreadCount(req.user!.id)
+      res.json(success({ count }, "Unread count fetched"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  // ─── POST /admin/notifications ─────────────────────────────────────────────────
+
+  async adminSendNotification(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const schema = z.object({
+        target: z.enum(["all", "user"]),
+        userIds: z.array(z.string().uuid()).optional(),
+        title: z.string().min(1).max(100),
+        body: z.string().min(1).max(300),
+      })
+      const parsed = schema.safeParse(req.body)
+      if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message)
+
+      const result = await this.notificationService.sendBroadcast(parsed.data)
+      res.json(success(result, `Notification sent to ${result.sent} user(s)`))
+    } catch (err) {
+      next(err)
+    }
+  }
+
   // ─── GET /admin/notifications ──────────────────────────────────────────────────
 
   async adminListNotifications(req: Request, res: Response, next: NextFunction): Promise<void> {

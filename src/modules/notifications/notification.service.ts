@@ -1,6 +1,7 @@
 import { Repository } from "typeorm"
 import { DeviceToken } from "../../entities/DeviceToken.entity"
 import { Notification } from "../../entities/Notification.entity"
+import { User } from "../../entities/User.entity"
 import { NotificationType, Platform } from "../../enums/index"
 import { INotificationProvider, PushMessage } from "./providers/notification-provider.interface"
 import { NotFoundError, ForbiddenError } from "../../shared/errors"
@@ -24,6 +25,7 @@ export class NotificationService {
     private readonly deviceTokenRepo: Repository<DeviceToken>,
     private readonly notificationRepo: Repository<Notification>,
     private readonly provider: INotificationProvider,
+    private readonly userRepo: Repository<User>,
   ) {}
 
   // ─── POST /notifications/device ───────────────────────────────────────────────
@@ -98,6 +100,73 @@ export class NotificationService {
 
   async markAllAsRead(userId: string): Promise<void> {
     await this.notificationRepo.update({ userId, read: false }, { read: true, readAt: new Date() })
+  }
+
+  // ─── GET /notifications/unread-count ──────────────────────────────────────────
+
+  async getUnreadCount(userId: string): Promise<number> {
+    return this.notificationRepo.count({ where: { userId, read: false } })
+  }
+
+  // ─── POST /admin/notifications (broadcast or targeted) ────────────────────────
+
+  async sendBroadcast(dto: {
+    target: "all" | "user"
+    userIds?: string[]
+    title: string
+    body: string
+  }): Promise<{ sent: number }> {
+    let targetUserIds: string[]
+
+    if (dto.target === "all") {
+      const users = await this.userRepo.find({
+        where: { isBanned: false },
+        select: ["id"],
+      })
+      targetUserIds = users.map((u) => u.id)
+    } else {
+      targetUserIds = dto.userIds ?? []
+    }
+
+    if (!targetUserIds.length) return { sent: 0 }
+
+    // Save notification record for each user
+    const records = targetUserIds.map((userId) =>
+      this.notificationRepo.create({
+        userId,
+        type: NotificationType.SYSTEM,
+        title: dto.title,
+        body: dto.body,
+        data: null,
+        read: false,
+      }),
+    )
+    await this.notificationRepo.save(records)
+
+    // Push via FCM (best-effort — don't fail if no device tokens)
+    const deviceTokens = await this.deviceTokenRepo
+      .createQueryBuilder("dt")
+      .where("dt.user_id IN (:...ids)", { ids: targetUserIds })
+      .getMany()
+
+    if (deviceTokens.length) {
+      const tokens = deviceTokens.map((d) => d.fcmToken)
+      const msg: PushMessage = { title: dto.title, body: dto.body }
+      try {
+        const result = await this.provider.sendMulticast(tokens, msg)
+        if (result.failedTokens.length) {
+          await this.deviceTokenRepo
+            .createQueryBuilder()
+            .delete()
+            .where("fcm_token IN (:...tokens)", { tokens: result.failedTokens })
+            .execute()
+        }
+      } catch (err) {
+        logger.error("Broadcast push failed", { error: err })
+      }
+    }
+
+    return { sent: targetUserIds.length }
   }
 
   // ─── GET /admin/notifications ─────────────────────────────────────────────────
