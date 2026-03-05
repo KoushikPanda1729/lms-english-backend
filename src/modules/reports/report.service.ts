@@ -90,13 +90,23 @@ export class ReportService {
     page: number,
     limit: number,
   ): Promise<{ reports: Report[]; total: number; page: number; limit: number }> {
-    const where = status ? { status } : {}
-    const [reports, total] = await this.reportRepo.findAndCount({
-      where,
-      order: { createdAt: "DESC" },
-      skip: (page - 1) * limit,
-      take: limit,
-    })
+    const qb = this.reportRepo
+      .createQueryBuilder("r")
+      .leftJoinAndSelect("r.reporter", "reporter")
+      .leftJoin("reporter.profile", "reporterProfile")
+      .addSelect(["reporterProfile.displayName", "reporterProfile.avatarUrl"])
+      .leftJoinAndSelect("r.reported", "reported")
+      .leftJoin("reported.profile", "reportedProfile")
+      .addSelect(["reportedProfile.displayName", "reportedProfile.avatarUrl"])
+      .orderBy("r.createdAt", "DESC")
+      .skip((page - 1) * limit)
+      .take(limit)
+
+    if (status) {
+      qb.where("r.status = :status", { status })
+    }
+
+    const [reports, total] = await qb.getManyAndCount()
     return { reports, total, page, limit }
   }
 
