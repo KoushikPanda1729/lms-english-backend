@@ -10,6 +10,7 @@ interface SocketData {
   userId: string
   email: string
   role: string
+  isBanned?: boolean
 }
 
 const ADMIN_ROLES = ["admin", "super_admin", "moderator"]
@@ -29,7 +30,7 @@ export function buildSupportGateway(
   profileRepo: Repository<Profile>,
 ): void {
   io.on("connection", (socket: Socket) => {
-    const { userId, role } = socket.data as SocketData
+    const { userId, role, isBanned } = socket.data as SocketData
     const isAdmin = ADMIN_ROLES.includes(role)
 
     // ── Online tracking ───────────────────────────────────────────────────
@@ -110,6 +111,7 @@ export function buildSupportGateway(
           userId,
           displayName,
           avatarUrl,
+          isBanned: isBanned || false,
           text: msg.text,
           fromAdmin: false,
           createdAt: msg.createdAt,

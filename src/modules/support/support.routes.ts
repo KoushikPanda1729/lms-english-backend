@@ -22,3 +22,10 @@ export function supportRouter(controller: SupportController): Router {
 
   return router
 }
+
+// Public route — no auth required (used by banned users)
+export function publicSupportRouter(controller: SupportController): Router {
+  const router = Router()
+  router.post("/contact", (req, res, next) => controller.guestContact(req, res, next))
+  return router
+}

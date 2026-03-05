@@ -20,6 +20,7 @@ interface SocketData {
   userId: string
   email: string
   role: string
+  isBanned?: boolean
 }
 
 interface JoinRoomPayload {
@@ -53,7 +54,10 @@ export function buildSignalingGateway(
   sessionService: SessionService,
 ): void {
   io.on("connection", (socket: Socket) => {
-    const { userId } = socket.data as SocketData
+    const { userId, isBanned } = socket.data as SocketData
+
+    // Banned users cannot do signaling
+    if (isBanned) return
 
     // ─── join_room ─────────────────────────────────────────────────────────────
     //

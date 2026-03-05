@@ -13,12 +13,15 @@ export class SupportMessage {
   @PrimaryGeneratedColumn("uuid")
   id!: string
 
-  @Column({ name: "user_id", type: "uuid" })
-  userId!: string
+  @Column({ name: "user_id", type: "uuid", nullable: true })
+  userId!: string | null
 
-  @ManyToOne(() => User, { onDelete: "CASCADE" })
+  @Column({ name: "guest_email", type: "varchar", length: 255, nullable: true })
+  guestEmail!: string | null
+
+  @ManyToOne(() => User, { onDelete: "CASCADE", nullable: true })
   @JoinColumn({ name: "user_id" })
-  user!: User
+  user!: User | null
 
   /** true = sent by admin, false = sent by user */
   @Column({ name: "from_admin", default: false })

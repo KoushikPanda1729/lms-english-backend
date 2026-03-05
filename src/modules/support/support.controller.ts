@@ -45,4 +45,27 @@ export class SupportController {
       next(err)
     }
   }
+
+  // POST /support/contact (no auth — for banned users)
+  async guestContact(req: Request, res: Response, next: NextFunction) {
+    try {
+      const { email, message } = req.body ?? {}
+      if (!email || typeof email !== "string" || !message || typeof message !== "string") {
+        res
+          .status(400)
+          .json({ success: false, error: { message: "email and message are required" } })
+        return
+      }
+      const trimmedEmail = email.trim().toLowerCase()
+      const trimmedText = message.trim()
+      if (!trimmedEmail || !trimmedText || trimmedText.length > 2000) {
+        res.status(400).json({ success: false, error: { message: "Invalid input" } })
+        return
+      }
+      await this.supportService.saveGuestMessage(trimmedEmail, trimmedText)
+      res.json({ success: true })
+    } catch (err) {
+      next(err)
+    }
+  }
 }

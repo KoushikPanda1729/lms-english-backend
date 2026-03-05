@@ -29,6 +29,7 @@ interface SocketData {
   userId: string
   email: string
   role: string
+  isBanned: boolean
 }
 
 interface FindPartnerPayload {
@@ -89,10 +90,11 @@ export function buildMatchmakingGateway(
       const payload = await verifyAccessToken(token)
 
       const user = await userRepo.findOne({ where: { id: payload.sub } })
-      if (!user || user.isBanned) return next(new Error("UNAUTHORIZED"))
+      if (!user) return next(new Error("UNAUTHORIZED"))
       ;(socket.data as SocketData).userId = payload.sub
       ;(socket.data as SocketData).email = payload.email
       ;(socket.data as SocketData).role = payload.role
+      ;(socket.data as SocketData).isBanned = user.isBanned
 
       next()
     } catch {
@@ -103,11 +105,14 @@ export function buildMatchmakingGateway(
   // ─── Connection ─────────────────────────────────────────────────────────────
 
   io.on("connection", (socket: Socket) => {
-    const { userId } = socket.data as SocketData
+    const { userId, isBanned } = socket.data as SocketData
 
-    // Join personal room so others can target this socket by userId
+    // Always join personal room (needed for support replies to reach banned users too)
     socket.join(`user:${userId}`)
-    logger.debug(`Socket connected userId=${userId} socketId=${socket.id}`)
+    logger.debug(`Socket connected userId=${userId} socketId=${socket.id} banned=${isBanned}`)
+
+    // Banned users are only allowed to use the support chat
+    if (isBanned) return
 
     // ─── find_partner ─────────────────────────────────────────────────────────
 
