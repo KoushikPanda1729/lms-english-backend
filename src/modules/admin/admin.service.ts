@@ -5,7 +5,10 @@ import { RefreshToken } from "../../entities/RefreshToken.entity"
 import { Report } from "../../entities/Report.entity"
 import { CallSession } from "../../entities/CallSession.entity"
 import { Course } from "../../entities/Course.entity"
+import { Payment } from "../../entities/Payment.entity"
+import { UserCourseProgress } from "../../entities/UserCourseProgress.entity"
 import { UserRole, ReportStatus, NotificationType } from "../../enums/index"
+import { PaymentStatus } from "../../enums/payment-status.enum"
 import { NotFoundError, ValidationError } from "../../shared/errors"
 import { NotificationService } from "../notifications/notification.service"
 import logger from "../../config/logger"
@@ -33,6 +36,8 @@ export class AdminService {
     private readonly sessionRepo: Repository<CallSession>,
     private readonly notificationService: NotificationService,
     private readonly courseRepo: Repository<Course>,
+    private readonly paymentRepo: Repository<Payment>,
+    private readonly courseProgressRepo: Repository<UserCourseProgress>,
   ) {}
 
   // ─── GET /admin/users ─────────────────────────────────────────────────────────
@@ -217,6 +222,120 @@ export class AdminService {
       totalCourses,
       publishedCourses,
       avgSessionMinutes,
+    }
+  }
+
+  // ─── GET /admin/analytics ─────────────────────────────────────────────────────
+
+  async getAnalytics(): Promise<{
+    payments: {
+      totalRevenue: number
+      paidCount: number
+      pendingCount: number
+      failedCount: number
+    }
+    topCourses: {
+      id: string
+      title: string
+      enrolledCount: number
+      completedCount: number
+      completionRate: number
+      paidCount: number
+    }[]
+    userGrowth: {
+      month: string
+      newUsers: number
+    }[]
+  }> {
+    // Payment aggregates
+    const [paidCount, pendingCount, failedCount, revenueResult] = await Promise.all([
+      this.paymentRepo.count({ where: { status: PaymentStatus.PAID } }),
+      this.paymentRepo.count({ where: { status: PaymentStatus.PENDING } }),
+      this.paymentRepo.count({ where: { status: PaymentStatus.FAILED } }),
+      this.paymentRepo
+        .createQueryBuilder("p")
+        .select("SUM(p.amount)", "total")
+        .where("p.status = :status", { status: PaymentStatus.PAID })
+        .getRawOne<{ total: string }>(),
+    ])
+
+    const totalRevenue = revenueResult?.total ? Math.round(Number(revenueResult.total) / 100) : 0
+
+    // Top courses by enrollment (up to 10)
+    const courses = await this.courseRepo
+      .createQueryBuilder("c")
+      .select(["c.id", "c.title"])
+      .where("c.isPublished = true")
+      .getMany()
+
+    const courseIds = courses.map((c) => c.id)
+
+    const [progressRows, paidRows] =
+      courseIds.length > 0
+        ? await Promise.all([
+            this.courseProgressRepo
+              .createQueryBuilder("p")
+              .select("p.courseId", "courseId")
+              .addSelect("COUNT(*)", "enrolledCount")
+              .addSelect(
+                "SUM(CASE WHEN p.completedAt IS NOT NULL THEN 1 ELSE 0 END)",
+                "completedCount",
+              )
+              .where("p.courseId IN (:...ids)", { ids: courseIds })
+              .groupBy("p.courseId")
+              .getRawMany<{ courseId: string; enrolledCount: string; completedCount: string }>(),
+            this.paymentRepo
+              .createQueryBuilder("p")
+              .select("p.courseId", "courseId")
+              .addSelect("COUNT(*)", "paidCount")
+              .where("p.courseId IN (:...ids)", { ids: courseIds })
+              .andWhere("p.status = :status", { status: PaymentStatus.PAID })
+              .groupBy("p.courseId")
+              .getRawMany<{ courseId: string; paidCount: string }>(),
+          ])
+        : [[], []]
+
+    const progressMap = new Map(progressRows.map((r) => [r.courseId, r]))
+    const paidMap = new Map(paidRows.map((r) => [r.courseId, Number(r.paidCount)]))
+
+    const topCourses = courses
+      .map((c) => {
+        const p = progressMap.get(c.id)
+        const enrolled = p ? Number(p.enrolledCount) : 0
+        const completed = p ? Number(p.completedCount) : 0
+        return {
+          id: c.id,
+          title: c.title,
+          enrolledCount: enrolled,
+          completedCount: completed,
+          completionRate: enrolled > 0 ? Math.round((completed / enrolled) * 100) : 0,
+          paidCount: paidMap.get(c.id) ?? 0,
+        }
+      })
+      .sort((a, b) => b.enrolledCount - a.enrolledCount)
+      .slice(0, 10)
+
+    // Monthly user growth — last 6 months
+    const sixMonthsAgo = new Date()
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 5)
+    sixMonthsAgo.setDate(1)
+    sixMonthsAgo.setHours(0, 0, 0, 0)
+
+    const growthRows = await this.userRepo
+      .createQueryBuilder("u")
+      .select("TO_CHAR(u.createdAt, 'YYYY-MM')", "month")
+      .addSelect("COUNT(*)", "newUsers")
+      .where("u.createdAt >= :from", { from: sixMonthsAgo })
+      .groupBy("month")
+      .orderBy("month", "ASC")
+      .getRawMany<{ month: string; newUsers: string }>()
+
+    const userGrowth = growthRows.map((r) => ({ month: r.month, newUsers: Number(r.newUsers) }))
+
+    return {
+      payments: { totalRevenue, paidCount, pendingCount, failedCount },
+      topCourses,
+      userGrowth,
     }
   }
 

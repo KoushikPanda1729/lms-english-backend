@@ -112,6 +112,17 @@ export class AdminController {
     }
   }
 
+  // ─── GET /admin/analytics ─────────────────────────────────────────────────────
+
+  async getAnalytics(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const analytics = await this.adminService.getAnalytics()
+      res.json(success(analytics, "Analytics fetched"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
   // ─── POST /admin/notifications ────────────────────────────────────────────────
 
   async sendNotification(req: Request, res: Response, next: NextFunction): Promise<void> {

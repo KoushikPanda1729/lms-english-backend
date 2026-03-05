@@ -10,6 +10,7 @@ export function adminUserRouter(controller: AdminController): Router {
   router.use(adminMiddleware)
 
   router.get("/stats", (req, res, next) => controller.getStats(req, res, next))
+  router.get("/analytics", (req, res, next) => controller.getAnalytics(req, res, next))
   router.get("/users", (req, res, next) => controller.listUsers(req, res, next))
   router.get("/users/:id", (req, res, next) => controller.getUserDetail(req, res, next))
   router.patch("/users/:id/ban", (req, res, next) => controller.setUserBanned(req, res, next))

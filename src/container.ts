@@ -117,6 +117,8 @@ export function buildContainer() {
     sessionRepo,
     notificationService,
     courseRepo,
+    paymentRepo,
+    courseProgressRepo,
   )
   const adminController = new AdminController(adminService)
 
