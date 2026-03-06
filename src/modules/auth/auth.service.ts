@@ -159,7 +159,7 @@ export class AuthService {
 
   // ─── Google Sign-In ────────────────────────────────────────────────────────
 
-  async googleSignIn(params: GoogleSignInParams): Promise<TokenPair> {
+  async googleSignIn(params: GoogleSignInParams): Promise<TokenPair & { isNew: boolean }> {
     let googleId: string
     let email: string
     let email_verified: boolean
@@ -195,6 +195,8 @@ export class AuthService {
       where: [{ googleId }, { email }],
     })
 
+    let isNew = false
+
     if (user) {
       if (user.isBanned) throw new UnauthorizedError("Account suspended")
 
@@ -205,6 +207,7 @@ export class AuthService {
         user.isVerified = true
       }
     } else {
+      isNew = true
       // Auto-register new user + create profile in one transaction
       user = await this.dataSource.manager.transaction(async (manager) => {
         const u = manager.create(User, {
@@ -221,7 +224,8 @@ export class AuthService {
       })
     }
 
-    return this.issueTokens(user, params.deviceId, params.platform)
+    const tokens = await this.issueTokens(user, params.deviceId, params.platform)
+    return { ...tokens, isNew }
   }
 
   // ─── Self ──────────────────────────────────────────────────────────────────

@@ -3,14 +3,16 @@ import type { Redis } from "ioredis"
 import { DataSource, Repository } from "typeorm"
 import { Payment } from "../../entities/Payment.entity"
 import { Course } from "../../entities/Course.entity"
+import { User } from "../../entities/User.entity"
 import { UserCourseProgress } from "../../entities/UserCourseProgress.entity"
 import { PaymentStatus } from "../../enums/payment-status.enum"
 import { NotFoundError, ConflictError, ValidationError } from "../../shared/errors"
 import { Config } from "../../config/config"
 import type { IPaymentProvider } from "./providers/payment-provider.interface"
 import type { NotificationService } from "../notifications/notification.service"
+import type { AdminActivityService } from "../notifications/admin-activity.service"
 import type { CouponService } from "../coupons/coupon.service"
-import { NotificationType } from "../../enums/index"
+import { NotificationType, AdminActivityType } from "../../enums/index"
 import logger from "../../config/logger"
 
 const IDEMPOTENCY_TTL = 86400 // 24 hours
@@ -35,6 +37,7 @@ export class PaymentService {
     private readonly redis: Redis,
     private readonly notificationService: NotificationService,
     private readonly couponService?: CouponService,
+    private readonly adminActivityService?: AdminActivityService,
   ) {}
 
   // ─── GET /payments/courses/:courseId/quote ────────────────────────────────────
@@ -207,13 +210,35 @@ export class PaymentService {
   async handleWebhook(rawBody: Buffer, signature: string): Promise<void> {
     const event = this.provider.verifyWebhook(rawBody, signature)
 
+    logger.info("Webhook received", {
+      type: event.type,
+      providerSessionId: event.providerSessionId,
+    })
+
     if (event.type === "payment.success" && event.providerSessionId) {
       const payment = await this.paymentRepo.findOne({
         where: { providerSessionId: event.providerSessionId },
       })
 
+      logger.info("Webhook payment lookup", {
+        providerSessionId: event.providerSessionId,
+        found: !!payment,
+        status: payment?.status ?? "not_found",
+      })
+
       // Idempotent — ignore if not found or already processed
-      if (!payment || payment.status === PaymentStatus.PAID) return
+      if (!payment) {
+        logger.warn("Webhook: no matching payment record found", {
+          providerSessionId: event.providerSessionId,
+        })
+        return
+      }
+      if (payment.status === PaymentStatus.PAID) {
+        logger.info("Webhook: payment already PAID, skipping", {
+          providerSessionId: event.providerSessionId,
+        })
+        return
+      }
 
       // Price integrity check — Stripe returns amount in paise, DB stores in rupees.
       // Multiply DB amount by 100 before comparing.
@@ -264,6 +289,29 @@ export class PaymentService {
           data: { courseId: payment.courseId },
         })
         .catch(() => null)
+
+      // Record admin activity (fire-and-forget)
+      logger.info("Webhook: recording admin activity for purchase", {
+        courseId: payment.courseId,
+        userId: payment.userId,
+      })
+      const [course, buyer] = await Promise.all([
+        this.courseRepo
+          .findOne({ where: { id: payment.courseId }, select: ["title"] })
+          .catch(() => null),
+        this.dataSource.manager
+          .findOne(User, { where: { id: payment.userId }, select: ["email"] })
+          .catch(() => null),
+      ])
+      this.adminActivityService
+        ?.record(
+          AdminActivityType.COURSE_PURCHASED,
+          "Course Purchased",
+          `${buyer?.email ?? "A user"} purchased "${course?.title ?? "a course"}"`,
+          { courseId: payment.courseId, userId: payment.userId, email: buyer?.email ?? "" },
+        )
+        .then(() => logger.info("Webhook: admin activity recorded OK"))
+        .catch((err) => logger.error("Webhook: admin activity record FAILED", { err }))
     }
 
     if (event.type === "payment.refunded" && event.providerPaymentId) {

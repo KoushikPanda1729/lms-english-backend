@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express"
 import { z } from "zod"
 import { NotificationService } from "./notification.service"
+import { AdminActivityService } from "./admin-activity.service"
 import { Platform } from "../../enums/index"
 import { success } from "../../shared/response"
 import { ValidationError } from "../../shared/errors"
@@ -23,7 +24,10 @@ const paginationSchema = z.object({
 })
 
 export class NotificationController {
-  constructor(private readonly notificationService: NotificationService) {}
+  constructor(
+    private readonly notificationService: NotificationService,
+    private readonly adminActivityService?: AdminActivityService,
+  ) {}
 
   // ─── POST /notifications/device ───────────────────────────────────────────────
 
@@ -162,6 +166,41 @@ export class NotificationController {
         parsed.data.sentAt,
       )
       res.json(success(null, "Broadcast deleted"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  // ─── GET /admin/activity ──────────────────────────────────────────────────────
+
+  async getAdminActivity(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const result = await this.adminActivityService!.getRecent(30)
+      res.json(success(result, "Admin activity fetched"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  // ─── PATCH /admin/activity/:id/seen ──────────────────────────────────────────
+
+  async markAdminActivityItemSeen(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id)
+      if (!uuidRegex.test(id)) throw new ValidationError("Invalid activity ID")
+      await this.adminActivityService!.markSeen(id)
+      res.json(success(null, "Marked as seen"))
+    } catch (err) {
+      next(err)
+    }
+  }
+
+  // ─── PATCH /admin/activity/seen ───────────────────────────────────────────────
+
+  async markAdminActivitySeen(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      await this.adminActivityService!.markAllSeen()
+      res.json(success(null, "Marked as seen"))
     } catch (err) {
       next(err)
     }

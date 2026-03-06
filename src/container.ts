@@ -19,10 +19,12 @@ import { ReportController } from "./modules/reports/report.controller"
 import { AdminService } from "./modules/admin/admin.service"
 import { AdminController } from "./modules/admin/admin.controller"
 import { NotificationService } from "./modules/notifications/notification.service"
+import { AdminActivityService } from "./modules/notifications/admin-activity.service"
 import { NotificationController } from "./modules/notifications/notification.controller"
 import { createNotificationProvider } from "./modules/notifications/providers/notification-provider.factory"
 import { StorageService } from "./services/storage.service"
 import { HlsService } from "./services/hls.service"
+import { AdminActivity } from "./entities/AdminActivity.entity"
 import { Course } from "./entities/Course.entity"
 import { Lesson } from "./entities/Lesson.entity"
 import { Quiz } from "./entities/Quiz.entity"
@@ -60,6 +62,7 @@ export function buildContainer() {
   const reportRepo = AppDataSource.getRepository(Report)
   const deviceTokenRepo = AppDataSource.getRepository(DeviceToken)
   const notificationRepo = AppDataSource.getRepository(Notification)
+  const adminActivityRepo = AppDataSource.getRepository(AdminActivity)
   const courseRepo = AppDataSource.getRepository(Course)
   const lessonRepo = AppDataSource.getRepository(Lesson)
   const quizRepo = AppDataSource.getRepository(Quiz)
@@ -86,7 +89,11 @@ export function buildContainer() {
     notificationProvider,
     userRepo,
   )
-  const notificationController = new NotificationController(notificationService)
+  const adminActivityService = new AdminActivityService(adminActivityRepo)
+  const notificationController = new NotificationController(
+    notificationService,
+    adminActivityService,
+  )
 
   // ─── Auth ───────────────────────────────────────────────────────────────────
   const authService = new AuthService(
@@ -95,7 +102,7 @@ export function buildContainer() {
     passwordResetTokenRepo,
     AppDataSource,
   )
-  const authController = new AuthController(authService, notificationService)
+  const authController = new AuthController(authService, notificationService, adminActivityService)
 
   // ─── Users ──────────────────────────────────────────────────────────────────
   const userService = new UserService(profileRepo, storageService)
@@ -167,6 +174,7 @@ export function buildContainer() {
     redis,
     notificationService,
     couponService,
+    adminActivityService,
   )
   const paymentController = new PaymentController(paymentService)
 
@@ -179,6 +187,7 @@ export function buildContainer() {
     adminController,
     notificationController,
     notificationService,
+    adminActivityService,
     courseController,
     paymentController,
     couponController,

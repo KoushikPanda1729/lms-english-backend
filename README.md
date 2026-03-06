@@ -275,7 +275,7 @@ npm run migration:run                 runs all pending migrations
 npm run dev                           starts dev server on port 5503
 
 # In a separate terminal for Stripe webhooks:
-stripe listen --forward-to localhost:5503/payments/webhook
+c
 # Copy the webhook secret printed by stripe listen into STRIPE_WEBHOOK_SECRET in .env
 ```
 

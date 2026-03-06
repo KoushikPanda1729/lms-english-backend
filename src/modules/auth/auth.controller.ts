@@ -2,7 +2,8 @@ import { Request, Response, NextFunction } from "express"
 import { z } from "zod"
 import { AuthService } from "./auth.service"
 import { NotificationService } from "../notifications/notification.service"
-import { Platform } from "../../enums/index"
+import { AdminActivityService } from "../notifications/admin-activity.service"
+import { Platform, AdminActivityType } from "../../enums/index"
 import { success } from "../../shared/response"
 import { ValidationError } from "../../shared/errors"
 import { Config } from "../../config/config"
@@ -77,6 +78,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly notificationService: NotificationService,
+    private readonly adminActivityService?: AdminActivityService,
   ) {}
 
   async self(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -96,6 +98,16 @@ export class AuthController {
       const result = await this.authService.register(parsed.data)
       setAuthCookies(res, result)
       res.status(201).json(success(result, "Registration successful"))
+
+      // Record admin activity (fire-and-forget)
+      this.adminActivityService
+        ?.record(
+          AdminActivityType.USER_REGISTERED,
+          "New User Registered",
+          `${parsed.data.email} signed up`,
+          { email: parsed.data.email },
+        )
+        .catch(() => {})
     } catch (err) {
       next(err)
     }
@@ -144,9 +156,20 @@ export class AuthController {
       const parsed = googleSignInSchema.safeParse(req.body)
       if (!parsed.success) throw new ValidationError(parsed.error.errors[0].message)
 
-      const result = await this.authService.googleSignIn(parsed.data)
+      const { isNew, ...result } = await this.authService.googleSignIn(parsed.data)
       setAuthCookies(res, result)
       res.json(success(result, "Google sign-in successful"))
+
+      // Record admin activity for new Google registrations (fire-and-forget)
+      if (isNew) {
+        this.adminActivityService
+          ?.record(
+            AdminActivityType.USER_REGISTERED,
+            "New User Registered",
+            `A user signed up via Google`,
+          )
+          .catch(() => {})
+      }
     } catch (err) {
       next(err)
     }

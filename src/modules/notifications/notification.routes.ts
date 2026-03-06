@@ -34,5 +34,13 @@ export function adminNotificationRouter(controller: NotificationController): Rou
     controller.adminDeleteBroadcast(req, res, next),
   )
 
+  router.get("/activity", (req, res, next) => controller.getAdminActivity(req, res, next))
+  router.patch("/activity/seen", (req, res, next) =>
+    controller.markAdminActivitySeen(req, res, next),
+  )
+  router.patch("/activity/:id/seen", (req, res, next) =>
+    controller.markAdminActivityItemSeen(req, res, next),
+  )
+
   return router
 }
