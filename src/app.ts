@@ -18,6 +18,10 @@ import { paymentRouter } from "./modules/payments/payment.routes"
 import { couponRouter } from "./modules/coupons/coupon.routes"
 import { supportRouter, publicSupportRouter } from "./modules/support/support.routes"
 import { onboardingRouter, adminOnboardingRouter } from "./modules/onboarding/onboarding.routes"
+import {
+  aiConversationRouter,
+  adminAIConversationRouter,
+} from "./modules/ai-conversation/ai-conversation.routes"
 import { jwksRouter } from "./modules/well-known/jwks.routes"
 import { globalErrorHandler } from "./middleware/error.middleware"
 import type { Container } from "./container"
@@ -82,6 +86,8 @@ export function buildApp(container: Container): Application {
   app.use("/support", publicSupportRouter(container.supportController))
   app.use("/onboarding", onboardingRouter(container.onboardingController))
   app.use("/admin", adminOnboardingRouter(container.onboardingController))
+  app.use("/ai-conversation", aiConversationRouter(container.aiConversationController))
+  app.use("/admin", adminAIConversationRouter(container.aiConversationController))
   app.use("/.well-known", jwksRouter())
 
   // ─── Global error handler (must be last) ─────────────────────────────────────

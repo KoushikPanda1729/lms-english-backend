@@ -94,6 +94,12 @@ const {
   ADMIN_PASSWORD,
   ADMIN_FIRST_NAME,
   ADMIN_LAST_NAME,
+
+  // AI Conversation
+  AI_PROVIDER,
+  OPENAI_API_KEY,
+  GEMINI_API_KEY,
+  GROQ_API_KEY,
 } = process.env
 
 // ─── PEM key handling ──────────────────────────────────────────────────────────
@@ -188,4 +194,10 @@ export const Config = {
   ADMIN_PASSWORD: ADMIN_PASSWORD || "",
   ADMIN_FIRST_NAME: ADMIN_FIRST_NAME || "",
   ADMIN_LAST_NAME: ADMIN_LAST_NAME || "",
+
+  // AI Conversation
+  AI_PROVIDER: (AI_PROVIDER || "groq") as "openai" | "gemini" | "groq",
+  OPENAI_API_KEY: OPENAI_API_KEY || "",
+  GEMINI_API_KEY: GEMINI_API_KEY || "",
+  GROQ_API_KEY: GROQ_API_KEY || "",
 }

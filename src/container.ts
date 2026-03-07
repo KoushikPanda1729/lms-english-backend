@@ -50,6 +50,11 @@ import { SupportController } from "./modules/support/support.controller"
 import { OnboardingQuestion } from "./entities/OnboardingQuestion.entity"
 import { OnboardingService } from "./modules/onboarding/onboarding.service"
 import { OnboardingController } from "./modules/onboarding/onboarding.controller"
+import { AIPersona } from "./entities/AIPersona.entity"
+import { AISession } from "./entities/AISession.entity"
+import { AIConversationService } from "./modules/ai-conversation/ai-conversation.service"
+import { AIConversationController } from "./modules/ai-conversation/ai-conversation.controller"
+import { createAIVoiceProvider } from "./modules/ai-conversation/providers/ai-voice.provider.factory"
 
 export function buildContainer() {
   // ─── Repositories ───────────────────────────────────────────────────────────
@@ -75,6 +80,8 @@ export function buildContainer() {
   const couponRepo = AppDataSource.getRepository(Coupon)
   const supportMessageRepo = AppDataSource.getRepository(SupportMessage)
   const onboardingQuestionRepo = AppDataSource.getRepository(OnboardingQuestion)
+  const aiPersonaRepo = AppDataSource.getRepository(AIPersona)
+  const aiSessionRepo = AppDataSource.getRepository(AISession)
 
   // ─── Shared services ────────────────────────────────────────────────────────
   const storageService = new StorageService()
@@ -163,6 +170,19 @@ export function buildContainer() {
   const onboardingService = new OnboardingService(onboardingQuestionRepo, profileRepo)
   const onboardingController = new OnboardingController(onboardingService)
 
+  // ─── AI Conversation ─────────────────────────────────────────────────────────
+  const aiVoiceProvider = createAIVoiceProvider()
+  const aiConversationService = new AIConversationService(
+    aiPersonaRepo,
+    aiSessionRepo,
+    aiVoiceProvider,
+    storageService,
+  )
+  const aiConversationController = new AIConversationController(
+    aiConversationService,
+    storageService,
+  )
+
   // ─── Payments ───────────────────────────────────────────────────────────────
   const paymentProvider = createPaymentProvider()
   const paymentService = new PaymentService(
@@ -194,6 +214,7 @@ export function buildContainer() {
     supportService,
     supportController,
     onboardingController,
+    aiConversationController,
     userRepo,
     profileRepo,
   }
