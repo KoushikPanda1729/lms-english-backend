@@ -1,3 +1,5 @@
+// This script generates an RSA key pair and saves them to the ./keys/ directory.
+
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
