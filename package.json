@@ -2,7 +2,6 @@
   "name": "english-speaking-backend",
   "version": "1.0.0",
   "description": "English Speaking Practice Platform Backend",
-  "type": "module",
   "main": "dist/main.js",
   "scripts": {
     "dev": "cross-env NODE_ENV=development nodemon",

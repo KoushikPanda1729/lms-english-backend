@@ -1,10 +1,6 @@
 import { config } from "dotenv"
 import path from "path"
 import fs from "fs"
-import { fileURLToPath } from "url"
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 // Only load .env file if not in Docker (Docker uses --env-file flag)
 const isDocker = fs.existsSync("/.dockerenv")

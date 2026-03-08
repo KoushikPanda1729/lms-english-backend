@@ -1,7 +1,6 @@
 import "reflect-metadata"
 import pg from "pg"
 import { DataSource } from "typeorm"
-import { fileURLToPath } from "url"
 import path from "path"
 import { Config } from "./config"
 
@@ -11,9 +10,6 @@ import { Config } from "./config"
 // Fix: append 'Z' so JS always treats them as UTC.
 pg.types.setTypeParser(1114, (str: string) => new Date(str + "Z")) // timestamp
 pg.types.setTypeParser(1184, (str: string) => new Date(str)) // timestamptz (already has tz info)
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
 
 export const AppDataSource = new DataSource({
   type: "postgres",
