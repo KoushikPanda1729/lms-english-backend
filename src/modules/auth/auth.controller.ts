@@ -50,24 +50,27 @@ const resetPasswordSchema = z.object({
 const IS_PROD = Config.NODE_ENV === "production" && process.env.COOKIE_SECURE !== "false"
 const REFRESH_MAX_AGE = 30 * 24 * 60 * 60 * 1000 // 30d
 const ACCESS_MAX_AGE = 15 * 60 * 1000 // 15m
+const COOKIE_DOMAIN = IS_PROD ? ".koushikpanda.online" : undefined
 
 function setAuthCookies(res: Response, tokens: TokenPair): void {
   res.cookie("accessToken", tokens.accessToken, {
     httpOnly: true,
     secure: IS_PROD,
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: ACCESS_MAX_AGE,
+    domain: COOKIE_DOMAIN,
   })
   res.cookie("refreshToken", tokens.refreshToken, {
     httpOnly: true,
     secure: IS_PROD,
-    sameSite: "strict",
+    sameSite: "lax",
     maxAge: REFRESH_MAX_AGE,
+    domain: COOKIE_DOMAIN,
   })
 }
 
 function clearAuthCookies(res: Response): void {
-  const opts = { httpOnly: true, secure: IS_PROD, sameSite: "strict" as const }
+  const opts = { httpOnly: true, secure: IS_PROD, sameSite: "lax" as const, domain: COOKIE_DOMAIN }
   res.clearCookie("accessToken", opts)
   res.clearCookie("refreshToken", opts)
 }
