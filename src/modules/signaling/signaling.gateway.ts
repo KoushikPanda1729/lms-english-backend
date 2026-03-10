@@ -180,6 +180,21 @@ export function buildSignalingGateway(
       },
     )
 
+    // ─── mute_state ────────────────────────────────────────────────────────────
+    //
+    // Either peer broadcasts their mic mute state. Relay to the other peer.
+
+    socket.on("mute_state", async (payload: { roomId: string; muted: boolean }) => {
+      try {
+        const { roomId, muted } = payload
+        if (typeof roomId !== "string" || !roomId) return
+        if (!(await assertRoomMember(redis, roomId, userId))) return
+        socket.to(`room:${roomId}`).emit("mute_state", { muted })
+      } catch (err) {
+        logger.error("mute_state error", { error: err, userId })
+      }
+    })
+
     // ─── typing ────────────────────────────────────────────────────────────────
     //
     // Either peer can broadcast their typing state. Relay to the other peer.
