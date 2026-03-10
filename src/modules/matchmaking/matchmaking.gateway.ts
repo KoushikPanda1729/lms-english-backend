@@ -8,6 +8,7 @@ import { Profile } from "../../entities/Profile.entity"
 import { verifyAccessToken } from "../auth/jwt.util"
 import { generateTurnCredentials } from "../../utils/turn.util"
 import { SessionService } from "../sessions/session.service"
+import { StorageService } from "../../services/storage.service"
 import logger from "../../config/logger"
 
 // ─── Redis key helpers ─────────────────────────────────────────────────────────
@@ -67,6 +68,7 @@ export function buildMatchmakingGateway(
   userRepo: Repository<User>,
   profileRepo: Repository<Profile>,
   sessionService: SessionService,
+  storageService: StorageService,
 ): void {
   // ─── Socket auth middleware ─────────────────────────────────────────────────
 
@@ -188,7 +190,7 @@ export function buildMatchmakingGateway(
             partner: {
               userId: myProfile?.userId,
               displayName: myProfile?.displayName || myProfile?.username,
-              avatarUrl: myProfile?.avatarUrl,
+              avatarUrl: storageService.signIfNeeded(myProfile?.avatarUrl ?? null),
               level: myProfile?.englishLevel,
             },
             iceServers: buildIceServers(partnerTurn),
@@ -200,7 +202,7 @@ export function buildMatchmakingGateway(
             partner: {
               userId: partnerProfile?.userId,
               displayName: partnerProfile?.displayName || partnerProfile?.username,
-              avatarUrl: partnerProfile?.avatarUrl,
+              avatarUrl: storageService.signIfNeeded(partnerProfile?.avatarUrl ?? null),
               level: partnerProfile?.englishLevel,
             },
             iceServers: buildIceServers(myTurn),

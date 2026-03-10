@@ -43,6 +43,7 @@ async function bootstrap() {
       container.userRepo,
       container.profileRepo,
       container.sessionService,
+      container.storageService,
     )
     logger.info("Matchmaking gateway ready")
 
